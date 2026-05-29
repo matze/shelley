@@ -3,6 +3,7 @@ mod client;
 mod config;
 mod model;
 mod propose;
+mod ui;
 
 use anyhow::Result;
 

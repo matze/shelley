@@ -1,10 +1,16 @@
 use std::io;
+use std::pin::pin;
 
 use anyhow::Result;
 use clap::{CommandFactory, Parser, Subcommand};
 use clap_complete::Shell;
+use strides::future::FutureExt;
+use strides::spinner::styles::DOTS_3;
 
+use crate::client::OpenAiClient;
 use crate::config::{Config, Provider};
+use crate::propose::{self, Selection, emit_command};
+use crate::ui;
 
 #[derive(Parser)]
 #[command(
@@ -69,8 +75,18 @@ fn generate_completions(shell: Shell) {
     clap_complete::generate(shell, &mut cmd, name, &mut io::stdout());
 }
 
-async fn propose(_config: Config, _query: String) -> Result<()> {
-    todo!()
+async fn propose(config: Config, query: String) -> Result<()> {
+    let model = OpenAiClient::new(&config)?;
+    let candidates = pin!(propose::propose(&model, &query))
+        .progress(spinner_theme())
+        .with_label("finding commands")
+        .await?;
+
+    let mut selection = Selection::new(candidates);
+    if let Some(chosen) = ui::select(&mut selection)? {
+        emit_command(io::stdout().lock(), &chosen.command)?;
+    }
+    Ok(())
 }
 
 async fn ask(_config: Config, _query: String) -> Result<()> {
