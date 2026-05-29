@@ -47,6 +47,14 @@ impl Message {
         }
     }
 
+    pub fn assistant_tool_calls(tool_calls: Vec<ToolCall>) -> Self {
+        Self {
+            role: Role::Assistant,
+            tool_calls,
+            ..Self::default()
+        }
+    }
+
     fn text(role: Role, content: impl Into<String>) -> Self {
         Self {
             role,
