@@ -1,4 +1,6 @@
 mod cli;
+mod config;
+mod model;
 
 use anyhow::Result;
 

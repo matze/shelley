@@ -4,6 +4,8 @@ use anyhow::Result;
 use clap::{CommandFactory, Parser, Subcommand};
 use clap_complete::Shell;
 
+use crate::config::{Config, Provider};
+
 #[derive(Parser)]
 #[command(
     name = "shelley",
@@ -11,6 +13,16 @@ use clap_complete::Shell;
     about = "A minimal oneshot shell agent: propose commands or answer read-only questions"
 )]
 struct Cli {
+    #[arg(
+        long,
+        value_enum,
+        global = true,
+        default_value = "openai",
+        help = "Model provider"
+    )]
+    provider: Provider,
+    #[arg(long, global = true, help = "Override the provider's default model")]
+    model: Option<String>,
     #[command(subcommand)]
     command: Command,
 }
@@ -35,10 +47,19 @@ enum Command {
 }
 
 pub async fn run() -> Result<()> {
-    match Cli::parse().command {
-        Command::Propose { query } => propose(query.join(" ")).await,
-        Command::Ask { query } => ask(query.join(" ")).await,
-        Command::Completions { shell } => Ok(generate_completions(shell)),
+    let cli = Cli::parse();
+
+    match cli.command {
+        Command::Propose { query } => {
+            propose(Config::from_env(cli.provider, cli.model)?, query.join(" ")).await
+        }
+        Command::Ask { query } => {
+            ask(Config::from_env(cli.provider, cli.model)?, query.join(" ")).await
+        }
+        Command::Completions { shell } => {
+            generate_completions(shell);
+            Ok(())
+        }
     }
 }
 
@@ -48,10 +69,10 @@ fn generate_completions(shell: Shell) {
     clap_complete::generate(shell, &mut cmd, name, &mut io::stdout());
 }
 
-async fn propose(_query: String) -> Result<()> {
+async fn propose(_config: Config, _query: String) -> Result<()> {
     todo!()
 }
 
-async fn ask(_query: String) -> Result<()> {
+async fn ask(_config: Config, _query: String) -> Result<()> {
     todo!()
 }
