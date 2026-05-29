@@ -2,6 +2,7 @@ mod cli;
 mod client;
 mod config;
 mod model;
+mod propose;
 
 use anyhow::Result;
 
