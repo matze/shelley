@@ -5,6 +5,7 @@ mod config;
 mod model;
 mod propose;
 mod render;
+mod shell;
 mod tools;
 mod ui;
 

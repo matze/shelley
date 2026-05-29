@@ -27,6 +27,7 @@ use crate::client::OpenAiClient;
 use crate::config::{Config, Provider, Sandbox};
 use crate::propose::{self, Selection, emit_command};
 use crate::render;
+use crate::shell::InitShell;
 use crate::tools::Tools;
 use crate::ui;
 
@@ -76,6 +77,11 @@ enum Command {
         #[arg(value_enum, help = "Target shell")]
         shell: Shell,
     },
+    #[command(name = "shell-init", about = "Print shell integration (the , and ? line widgets)")]
+    ShellInit {
+        #[arg(value_enum, help = "Target shell")]
+        shell: InitShell,
+    },
 }
 
 pub async fn run() -> Result<()> {
@@ -90,6 +96,10 @@ pub async fn run() -> Result<()> {
         }
         Command::Completions { shell } => {
             generate_completions(shell);
+            Ok(())
+        }
+        Command::ShellInit { shell } => {
+            print!("{}", crate::shell::integration(shell));
             Ok(())
         }
     }
