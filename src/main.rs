@@ -4,6 +4,7 @@ mod client;
 mod config;
 mod model;
 mod propose;
+mod render;
 mod tools;
 mod ui;
 

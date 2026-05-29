@@ -4,13 +4,29 @@ use std::pin::pin;
 use anyhow::Result;
 use clap::{CommandFactory, Parser, Subcommand};
 use clap_complete::Shell;
+use futures_channel::mpsc;
 use strides::future::FutureExt;
 use strides::spinner::styles::DOTS_3;
+use strides::{Layout, Segment, Theme};
+
+const ICON: &str = "🐚";
+
+static SPINNER_SEGMENTS: [Segment; 4] = [
+    Segment::literal(ICON),
+    Segment::spinner(),
+    Segment::label(),
+    Segment::message(),
+];
+
+fn spinner_theme() -> Theme<'static> {
+    Theme::from(DOTS_3).with_layout(Layout::new(&SPINNER_SEGMENTS))
+}
 
 use crate::ask;
 use crate::client::OpenAiClient;
 use crate::config::{Config, Provider, Sandbox};
 use crate::propose::{self, Selection, emit_command};
+use crate::render;
 use crate::tools::Tools;
 use crate::ui;
 
@@ -102,14 +118,14 @@ async fn propose(config: Config, query: String) -> Result<()> {
 async fn ask(config: Config, query: String) -> Result<()> {
     let model = OpenAiClient::new(&config)?;
     let tools = Tools::from_config(&config)?;
-    let answer = pin!(ask::ask(&model, &tools, &query, &config.budget))
-        .progress(DOTS_3)
-        .with_label("thinking")
+    let (tx, rx) = mpsc::unbounded::<String>();
+    let mut report = move |message: String| {
+        let _ = tx.unbounded_send(message);
+    };
+    let text = pin!(ask::ask(&model, &tools, &query, &config.budget, &mut report))
+        .progress(spinner_theme())
+        .with_messages(rx)
         .await?;
-
-    print!("{answer}");
-    if !answer.ends_with('\n') {
-        println!();
-    }
+    render::answer(&text)?;
     Ok(())
 }

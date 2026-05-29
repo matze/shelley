@@ -8,11 +8,13 @@ anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 clap_complete = "4"
 crossterm = "0.29"
+futures-channel = "0.3"
 futures-concurrency = "7"
 reqwest = { version = "0.13", default-features = false, features = ["json", "rustls", "webpki-roots"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 strides = "1.0.0-rc.2"
+termimad = "0.34"
 thiserror = "2"
 tokio = { version = "1", features = ["fs", "macros", "process", "rt"] }
 
