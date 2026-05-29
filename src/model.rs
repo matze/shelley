@@ -164,6 +164,12 @@ pub enum ModelError {
     EmptyResponse,
     #[error("fake model exhausted")]
     Exhausted,
+    #[error("transport error")]
+    Transport(#[source] Box<dyn std::error::Error + Send + Sync>),
+    #[error("api returned status {status}: {body}")]
+    Api { status: u16, body: String },
+    #[error("failed to decode response: {0}")]
+    Decode(String),
 }
 
 pub trait ChatModel {
