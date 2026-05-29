@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std::time::Duration;
 
 use thiserror::Error;
@@ -10,6 +8,14 @@ pub enum Provider {
     OpenAi,
     #[value(name = "deepseek")]
     DeepSeek,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, clap::ValueEnum)]
+pub enum Sandbox {
+    #[value(name = "enabled")]
+    Enabled,
+    #[value(name = "disabled")]
+    Disabled,
 }
 
 impl Provider {
@@ -56,10 +62,10 @@ impl Default for Budget {
 
 #[derive(Clone, Debug)]
 pub struct Config {
-    pub provider: Provider,
     pub base_url: String,
     pub model: String,
     pub api_key: String,
+    pub sandbox: Sandbox,
     pub budget: Budget,
 }
 
@@ -70,20 +76,24 @@ pub enum ConfigError {
 }
 
 impl Config {
-    pub fn new(provider: Provider, model: Option<String>, api_key: String) -> Self {
+    pub fn new(provider: Provider, model: Option<String>, api_key: String, sandbox: Sandbox) -> Self {
         Self {
             base_url: provider.base_url().to_string(),
             model: model.unwrap_or_else(|| provider.default_model().to_string()),
             api_key,
-            provider,
+            sandbox,
             budget: Budget::default(),
         }
     }
 
-    pub fn from_env(provider: Provider, model: Option<String>) -> Result<Self, ConfigError> {
+    pub fn from_env(
+        provider: Provider,
+        model: Option<String>,
+        sandbox: Sandbox,
+    ) -> Result<Self, ConfigError> {
         std::env::var(provider.api_key_env())
             .map_err(|_| ConfigError::MissingApiKey(provider.api_key_env()))
-            .map(|api_key| Self::new(provider, model, api_key))
+            .map(|api_key| Self::new(provider, model, api_key, sandbox))
     }
 }
 
@@ -101,14 +111,14 @@ mod tests {
 
     #[test]
     fn new_uses_default_model_when_unset() {
-        let config = Config::new(Provider::DeepSeek, None, "k".into());
+        let config = Config::new(Provider::DeepSeek, None, "k".into(), Sandbox::Disabled);
         assert_eq!(config.model, "deepseek-v4-pro");
         assert_eq!(config.base_url, "https://api.deepseek.com/v1");
     }
 
     #[test]
     fn new_respects_model_override() {
-        let config = Config::new(Provider::OpenAi, Some("gpt-x".into()), "k".into());
+        let config = Config::new(Provider::OpenAi, Some("gpt-x".into()), "k".into(), Sandbox::Disabled);
         assert_eq!(config.model, "gpt-x");
     }
 

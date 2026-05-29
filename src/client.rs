@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use reqwest::Client as HttpClient;
 
 use crate::config::Config;
@@ -68,14 +66,14 @@ fn transport(error: impl std::error::Error + Send + Sync + 'static) -> ModelErro
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::Provider;
+    use crate::config::{Provider, Sandbox};
     use crate::model::Reply;
     use serde_json::json;
     use wiremock::matchers::{body_partial_json, header, method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
     fn config_for(server: &MockServer, provider: Provider) -> Config {
-        let mut config = Config::new(provider, None, "secret".into());
+        let mut config = Config::new(provider, None, "secret".into(), Sandbox::Disabled);
         config.base_url = server.uri();
         config
     }

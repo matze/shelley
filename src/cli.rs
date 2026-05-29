@@ -7,9 +7,11 @@ use clap_complete::Shell;
 use strides::future::FutureExt;
 use strides::spinner::styles::DOTS_3;
 
+use crate::ask;
 use crate::client::OpenAiClient;
-use crate::config::{Config, Provider};
+use crate::config::{Config, Provider, Sandbox};
 use crate::propose::{self, Selection, emit_command};
+use crate::tools::Tools;
 use crate::ui;
 
 #[derive(Parser)]
@@ -29,6 +31,14 @@ struct Cli {
     provider: Provider,
     #[arg(long, global = true, help = "Override the provider's default model")]
     model: Option<String>,
+    #[arg(
+        long,
+        value_enum,
+        global = true,
+        default_value = "disabled",
+        help = "Run read-only tools inside a bubblewrap sandbox"
+    )]
+    sandbox: Sandbox,
     #[command(subcommand)]
     command: Command,
 }
@@ -57,10 +67,10 @@ pub async fn run() -> Result<()> {
 
     match cli.command {
         Command::Propose { query } => {
-            propose(Config::from_env(cli.provider, cli.model)?, query.join(" ")).await
+            propose(Config::from_env(cli.provider, cli.model, cli.sandbox)?, query.join(" ")).await
         }
         Command::Ask { query } => {
-            ask(Config::from_env(cli.provider, cli.model)?, query.join(" ")).await
+            ask(Config::from_env(cli.provider, cli.model, cli.sandbox)?, query.join(" ")).await
         }
         Command::Completions { shell } => {
             generate_completions(shell);
@@ -89,6 +99,17 @@ async fn propose(config: Config, query: String) -> Result<()> {
     Ok(())
 }
 
-async fn ask(_config: Config, _query: String) -> Result<()> {
-    todo!()
+async fn ask(config: Config, query: String) -> Result<()> {
+    let model = OpenAiClient::new(&config)?;
+    let tools = Tools::from_config(&config)?;
+    let answer = pin!(ask::ask(&model, &tools, &query, &config.budget))
+        .progress(DOTS_3)
+        .with_label("thinking")
+        .await?;
+
+    print!("{answer}");
+    if !answer.ends_with('\n') {
+        println!();
+    }
+    Ok(())
 }

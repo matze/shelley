@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use thiserror::Error;
@@ -32,10 +30,6 @@ impl Message {
 
     pub fn user(content: impl Into<String>) -> Self {
         Self::text(Role::User, content)
-    }
-
-    pub fn assistant(content: impl Into<String>) -> Self {
-        Self::text(Role::Assistant, content)
     }
 
     pub fn tool(tool_call_id: impl Into<String>, content: impl Into<String>) -> Self {
@@ -131,8 +125,6 @@ pub struct ChatResponse {
 #[derive(Debug, Deserialize)]
 pub struct Choice {
     pub message: Message,
-    #[serde(default)]
-    pub finish_reason: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -170,6 +162,7 @@ impl ChatResponse {
 pub enum ModelError {
     #[error("model returned no choices")]
     EmptyResponse,
+    #[cfg(test)]
     #[error("fake model exhausted")]
     Exhausted,
     #[error("transport error")]
