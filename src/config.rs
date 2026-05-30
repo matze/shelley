@@ -1,9 +1,14 @@
+use std::path::PathBuf;
 use std::time::Duration;
+use std::{env, fs, io};
 
+use serde::Deserialize;
 use thiserror::Error;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, clap::ValueEnum)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, clap::ValueEnum)]
+#[serde(rename_all = "lowercase")]
 pub enum Provider {
+    #[default]
     #[value(name = "openai")]
     OpenAi,
     #[value(name = "deepseek")]
@@ -69,10 +74,47 @@ pub struct Config {
     pub budget: Budget,
 }
 
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct FileConfig {
+    pub provider: Option<Provider>,
+    pub model: Option<String>,
+    pub api_key: Option<String>,
+}
+
 #[derive(Debug, Error)]
 pub enum ConfigError {
-    #[error("missing API key: set {0}")]
+    #[error("missing API key: set {0} or add api_key to the config file")]
     MissingApiKey(&'static str),
+    #[error("reading config {}", .path.display())]
+    Read {
+        path: PathBuf,
+        source: io::Error,
+    },
+    #[error("parsing config {}", .path.display())]
+    Parse {
+        path: PathBuf,
+        source: toml::de::Error,
+    },
+}
+
+fn config_path() -> Option<PathBuf> {
+    let base = env::var_os("XDG_CONFIG_HOME")
+        .map(PathBuf::from)
+        .filter(|path| path.is_absolute())
+        .or_else(|| env::var_os("HOME").map(|home| PathBuf::from(home).join(".config")))?;
+    Some(base.join("shelley").join("config.toml"))
+}
+
+fn load_file() -> Result<FileConfig, ConfigError> {
+    let Some(path) = config_path() else {
+        return Ok(FileConfig::default());
+    };
+    match fs::read_to_string(&path) {
+        Ok(text) => toml::from_str(&text).map_err(|source| ConfigError::Parse { path, source }),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(FileConfig::default()),
+        Err(source) => Err(ConfigError::Read { path, source }),
+    }
 }
 
 impl Config {
@@ -86,14 +128,26 @@ impl Config {
         }
     }
 
-    pub fn from_env(
-        provider: Provider,
+    pub fn resolve(
+        provider: Option<Provider>,
         model: Option<String>,
         sandbox: Sandbox,
     ) -> Result<Self, ConfigError> {
-        std::env::var(provider.api_key_env())
-            .map_err(|_| ConfigError::MissingApiKey(provider.api_key_env()))
-            .map(|api_key| Self::new(provider, model, api_key, sandbox))
+        Self::merge(load_file()?, provider, model, sandbox)
+    }
+
+    fn merge(
+        file: FileConfig,
+        provider: Option<Provider>,
+        model: Option<String>,
+        sandbox: Sandbox,
+    ) -> Result<Self, ConfigError> {
+        let provider = provider.or(file.provider).unwrap_or_default();
+        let api_key = env::var(provider.api_key_env())
+            .ok()
+            .or(file.api_key)
+            .ok_or(ConfigError::MissingApiKey(provider.api_key_env()))?;
+        Ok(Self::new(provider, model.or(file.model), api_key, sandbox))
     }
 }
 
@@ -120,6 +174,58 @@ mod tests {
     fn new_respects_model_override() {
         let config = Config::new(Provider::OpenAi, Some("gpt-x".into()), "k".into(), Sandbox::Disabled);
         assert_eq!(config.model, "gpt-x");
+    }
+
+    #[test]
+    fn file_config_parses_all_fields() {
+        let file: FileConfig = toml::from_str(
+            "provider = \"deepseek\"\nmodel = \"deepseek-v4-flash\"\napi_key = \"sk-file\"\n",
+        )
+        .unwrap();
+        assert_eq!(
+            file,
+            FileConfig {
+                provider: Some(Provider::DeepSeek),
+                model: Some("deepseek-v4-flash".into()),
+                api_key: Some("sk-file".into()),
+            }
+        );
+    }
+
+    #[test]
+    fn file_config_is_empty_by_default() {
+        assert_eq!(toml::from_str::<FileConfig>("").unwrap(), FileConfig::default());
+    }
+
+    #[test]
+    fn file_config_rejects_unknown_fields() {
+        assert!(toml::from_str::<FileConfig>("temperature = 0.5\n").is_err());
+    }
+
+    #[test]
+    fn merge_prefers_cli_over_file() {
+        let file = FileConfig {
+            provider: Some(Provider::OpenAi),
+            model: Some("from-file".into()),
+            api_key: Some("k".into()),
+        };
+        let config =
+            Config::merge(file, Some(Provider::DeepSeek), Some("from-cli".into()), Sandbox::Disabled)
+                .unwrap();
+        assert_eq!(config.base_url, "https://api.deepseek.com/v1");
+        assert_eq!(config.model, "from-cli");
+    }
+
+    #[test]
+    fn merge_falls_back_to_file_then_defaults() {
+        let file = FileConfig {
+            provider: Some(Provider::DeepSeek),
+            model: None,
+            api_key: Some("k".into()),
+        };
+        let config = Config::merge(file, None, None, Sandbox::Disabled).unwrap();
+        assert_eq!(config.base_url, "https://api.deepseek.com/v1");
+        assert_eq!(config.model, "deepseek-v4-pro");
     }
 
     #[test]

@@ -42,10 +42,9 @@ struct Cli {
         long,
         value_enum,
         global = true,
-        default_value = "openai",
-        help = "Model provider"
+        help = "Model provider (default: config file or openai)"
     )]
-    provider: Provider,
+    provider: Option<Provider>,
     #[arg(long, global = true, help = "Override the provider's default model")]
     model: Option<String>,
     #[arg(
@@ -89,10 +88,10 @@ pub async fn run() -> Result<()> {
 
     match cli.command {
         Command::Propose { query } => {
-            propose(Config::from_env(cli.provider, cli.model, cli.sandbox)?, query.join(" ")).await
+            propose(Config::resolve(cli.provider, cli.model, cli.sandbox)?, query.join(" ")).await
         }
         Command::Ask { query } => {
-            ask(Config::from_env(cli.provider, cli.model, cli.sandbox)?, query.join(" ")).await
+            ask(Config::resolve(cli.provider, cli.model, cli.sandbox)?, query.join(" ")).await
         }
         Command::Completions { shell } => {
             generate_completions(shell);

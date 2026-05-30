@@ -20,16 +20,35 @@ cargo build --release
 
 ## Configuration
 
-Set the API key for your provider:
+Settings are resolved in order of precedence: **command-line flags**, then
+**environment variables**, then the **config file**, then built-in defaults.
+
+### Config file
+
+Shelley reads `$XDG_CONFIG_HOME/shelley/config.toml` (falling back to
+`~/.config/shelley/config.toml`). All keys are optional:
+
+```toml
+provider = "deepseek"          # openai | deepseek
+model = "deepseek-v4-flash"    # override the provider's default model
+api_key = "sk-..."             # used if the provider's env var is unset
+```
+
+### Environment
+
+The API key may instead come from the provider's environment variable, which
+takes precedence over `api_key` in the file:
 
 ```sh
 export OPENAI_API_KEY=...     # default provider
-export DEEPSEEK_API_KEY=...   # with --provider deepseek
+export DEEPSEEK_API_KEY=...   # with provider = deepseek
 ```
 
-Global flags (work on any subcommand):
+### Global flags
 
-- `--provider openai|deepseek` (default `openai`)
+Flags (work on any subcommand) override both the file and the environment:
+
+- `--provider openai|deepseek` (file, else `openai`)
 - `--model <name>` — override the provider's default model
 - `--sandbox enabled|disabled` (default `disabled`) — run read-only file tools
   inside a [bubblewrap](https://github.com/containers/bubblewrap) sandbox

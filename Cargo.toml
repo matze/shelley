@@ -17,6 +17,7 @@ strides = "1.0.0-rc.2"
 termimad = "0.34"
 thiserror = "2"
 tokio = { version = "1", features = ["fs", "macros", "process", "rt"] }
+toml = { version = "1", default-features = false, features = ["parse", "serde", "std"] }
 
 [dev-dependencies]
 insta = "1"
