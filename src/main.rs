@@ -6,6 +6,7 @@ mod model;
 mod propose;
 mod render;
 mod shell;
+mod syntax;
 mod tools;
 mod ui;
 

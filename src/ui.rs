@@ -1,10 +1,18 @@
 use std::io::{self, Write};
 
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use crossterm::style::{Color, Stylize};
 use crossterm::terminal::{Clear, ClearType, disable_raw_mode, enable_raw_mode};
 use crossterm::{ExecutableCommand, cursor, execute, queue};
 
 use crate::propose::{Candidate, Selection};
+use crate::syntax::{self, Class, Span};
+
+#[derive(Clone, Copy)]
+enum Emphasis {
+    Normal,
+    Bold,
+}
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Action {
@@ -25,17 +33,73 @@ pub fn action_for(key: KeyEvent) -> Option<Action> {
     }
 }
 
-pub fn render(selection: &Selection) -> String {
+fn layout(selection: &Selection, line: impl Fn(&Candidate, bool, usize) -> String) -> String {
+    let width = selection
+        .candidates()
+        .iter()
+        .map(|candidate| candidate.command.chars().count())
+        .max()
+        .unwrap_or(0);
     selection
         .candidates()
         .iter()
         .enumerate()
-        .map(|(row, candidate)| {
-            let marker = if row == selection.cursor() { '>' } else { ' ' };
-            format!("{marker} {}  {}", candidate.command, candidate.explanation)
-        })
+        .map(|(row, candidate)| line(candidate, row == selection.cursor(), width))
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+fn render_colored(selection: &Selection) -> String {
+    layout(selection, |candidate, selected, width| {
+        let gap = " ".repeat(width - candidate.command.chars().count());
+        let marker = match selected {
+            true => "❯".with(Color::Cyan).bold().to_string(),
+            false => " ".to_string(),
+        };
+        let emphasis = match selected {
+            true => Emphasis::Bold,
+            false => Emphasis::Normal,
+        };
+        let command = highlight(&candidate.command, emphasis);
+        let explanation = explanation(&candidate.explanation, selected);
+        format!("{marker} {command}{gap}  {explanation}")
+    })
+}
+
+fn highlight(command: &str, emphasis: Emphasis) -> String {
+    syntax::spans(command)
+        .iter()
+        .map(|span| paint_span(span, emphasis))
+        .collect()
+}
+
+fn paint_span(span: &Span, emphasis: Emphasis) -> String {
+    let styled = match color_of(span.class) {
+        Some(color) => span.text.clone().with(color),
+        None => span.text.clone().stylize(),
+    };
+    match emphasis {
+        Emphasis::Bold => styled.bold().to_string(),
+        Emphasis::Normal => styled.to_string(),
+    }
+}
+
+fn color_of(class: Class) -> Option<Color> {
+    match class {
+        Class::Command => Some(Color::Green),
+        Class::Flag => Some(Color::Yellow),
+        Class::Operator => Some(Color::Magenta),
+        Class::Str => Some(Color::Cyan),
+        Class::Var => Some(Color::Blue),
+        Class::Plain | Class::Space => None,
+    }
+}
+
+fn explanation(text: &str, selected: bool) -> String {
+    match selected {
+        true => text.to_string(),
+        false => text.stylize().dim().to_string(),
+    }
 }
 
 pub fn select(selection: &mut Selection) -> io::Result<Option<Candidate>> {
@@ -81,7 +145,7 @@ fn interact(out: &mut impl Write, selection: &mut Selection) -> io::Result<Optio
 }
 
 fn draw(out: &mut impl Write, selection: &Selection) -> io::Result<()> {
-    for line in render(selection).split('\n') {
+    for line in render_colored(selection).split('\n') {
         write!(out, "{line}\r\n")?;
     }
     out.flush()
@@ -109,6 +173,14 @@ fn erase(out: &mut impl Write, rows: u16) -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn render(selection: &Selection) -> String {
+        layout(selection, |candidate, selected, width| {
+            let gap = " ".repeat(width - candidate.command.chars().count());
+            let marker = if selected { '>' } else { ' ' };
+            format!("{marker} {}{gap}  {}", candidate.command, candidate.explanation)
+        })
+    }
 
     fn key(code: KeyCode) -> KeyEvent {
         KeyEvent::new(code, KeyModifiers::NONE)
