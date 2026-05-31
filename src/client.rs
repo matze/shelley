@@ -1,7 +1,9 @@
 use reqwest::Client as HttpClient;
 
 use crate::config::Config;
-use crate::model::{ChatModel, ChatRequest, ChatResponse, Completion, Message, ModelError, ToolDef};
+use crate::model::{
+    ChatModel, ChatRequest, ChatResponse, Completion, Message, ModelError, ToolDef,
+};
 
 pub struct OpenAiClient {
     http: HttpClient,
@@ -134,7 +136,12 @@ mod tests {
             .await;
 
         let client = OpenAiClient::new(&config_for(&server, Provider::OpenAi)).unwrap();
-        match client.complete(&[Message::user("q")], &[]).await.unwrap().reply {
+        match client
+            .complete(&[Message::user("q")], &[])
+            .await
+            .unwrap()
+            .reply
+        {
             Reply::ToolCalls(calls) => assert_eq!(calls[0].function.name, "read_file"),
             other => panic!("expected tool calls, got {other:?}"),
         }

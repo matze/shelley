@@ -78,7 +78,10 @@ enum Command {
         #[arg(value_enum, help = "Target shell")]
         shell: Shell,
     },
-    #[command(name = "shell-init", about = "Print shell integration (the , and ? line widgets)")]
+    #[command(
+        name = "shell-init",
+        about = "Print shell integration (the , and ? line widgets)"
+    )]
     ShellInit {
         #[arg(value_enum, help = "Target shell")]
         shell: InitShell,
@@ -90,10 +93,18 @@ pub async fn run() -> Result<()> {
 
     match cli.command {
         Command::Propose { query } => {
-            propose(Config::resolve(cli.provider, cli.model, cli.sandbox)?, query.join(" ")).await
+            propose(
+                Config::resolve(cli.provider, cli.model, cli.sandbox)?,
+                query.join(" "),
+            )
+            .await
         }
         Command::Ask { query } => {
-            ask(Config::resolve(cli.provider, cli.model, cli.sandbox)?, query.join(" ")).await
+            ask(
+                Config::resolve(cli.provider, cli.model, cli.sandbox)?,
+                query.join(" "),
+            )
+            .await
         }
         Command::Completions { shell } => {
             generate_completions(shell);
@@ -133,10 +144,16 @@ async fn ask(config: Config, query: String) -> Result<()> {
     let mut report = move |message: String| {
         let _ = tx.unbounded_send(message);
     };
-    let text = pin!(ask::ask(&model, &tools, &query, &config.budget, &mut report))
-        .progress(spinner_theme())
-        .with_messages(rx)
-        .await?;
+    let text = pin!(ask::ask(
+        &model,
+        &tools,
+        &query,
+        &config.budget,
+        &mut report
+    ))
+    .progress(spinner_theme())
+    .with_messages(rx)
+    .await?;
     render::answer(&text)?;
     Ok(())
 }

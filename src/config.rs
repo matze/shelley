@@ -87,10 +87,7 @@ pub enum ConfigError {
     #[error("missing API key: set {0} or add api_key to the config file")]
     MissingApiKey(&'static str),
     #[error("reading config {}", .path.display())]
-    Read {
-        path: PathBuf,
-        source: io::Error,
-    },
+    Read { path: PathBuf, source: io::Error },
     #[error("parsing config {}", .path.display())]
     Parse {
         path: PathBuf,
@@ -118,7 +115,12 @@ fn load_file() -> Result<FileConfig, ConfigError> {
 }
 
 impl Config {
-    pub fn new(provider: Provider, model: Option<String>, api_key: String, sandbox: Sandbox) -> Self {
+    pub fn new(
+        provider: Provider,
+        model: Option<String>,
+        api_key: String,
+        sandbox: Sandbox,
+    ) -> Self {
         Self {
             base_url: provider.base_url().to_string(),
             model: model.unwrap_or_else(|| provider.default_model().to_string()),
@@ -172,7 +174,12 @@ mod tests {
 
     #[test]
     fn new_respects_model_override() {
-        let config = Config::new(Provider::OpenAi, Some("gpt-x".into()), "k".into(), Sandbox::Disabled);
+        let config = Config::new(
+            Provider::OpenAi,
+            Some("gpt-x".into()),
+            "k".into(),
+            Sandbox::Disabled,
+        );
         assert_eq!(config.model, "gpt-x");
     }
 
@@ -194,7 +201,10 @@ mod tests {
 
     #[test]
     fn file_config_is_empty_by_default() {
-        assert_eq!(toml::from_str::<FileConfig>("").unwrap(), FileConfig::default());
+        assert_eq!(
+            toml::from_str::<FileConfig>("").unwrap(),
+            FileConfig::default()
+        );
     }
 
     #[test]
@@ -209,9 +219,13 @@ mod tests {
             model: Some("from-file".into()),
             api_key: Some("k".into()),
         };
-        let config =
-            Config::merge(file, Some(Provider::DeepSeek), Some("from-cli".into()), Sandbox::Disabled)
-                .unwrap();
+        let config = Config::merge(
+            file,
+            Some(Provider::DeepSeek),
+            Some("from-cli".into()),
+            Sandbox::Disabled,
+        )
+        .unwrap();
         assert_eq!(config.base_url, "https://api.deepseek.com/v1");
         assert_eq!(config.model, "from-cli");
     }

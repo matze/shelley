@@ -34,8 +34,8 @@ pub fn build_messages(query: &str) -> Vec<Message> {
 }
 
 pub fn parse_candidates(text: &str) -> Result<Vec<Candidate>, ProposeError> {
-    let candidates: Vec<Candidate> =
-        serde_json::from_str(strip_fences(text)).map_err(|error| ProposeError::Parse(error.to_string()))?;
+    let candidates: Vec<Candidate> = serde_json::from_str(strip_fences(text))
+        .map_err(|error| ProposeError::Parse(error.to_string()))?;
     match candidates.is_empty() {
         true => Err(ProposeError::Empty),
         false => Ok(candidates.into_iter().take(MAX_CANDIDATES).collect()),
@@ -131,19 +131,16 @@ mod tests {
 
     #[test]
     fn parses_plain_json_array() {
-        let candidates = parse_candidates(
-            r#"[{"command": "ls -lS", "explanation": "why"}]"#,
-        )
-        .unwrap();
+        let candidates =
+            parse_candidates(r#"[{"command": "ls -lS", "explanation": "why"}]"#).unwrap();
         assert_eq!(candidates, sample(&["ls -lS"]));
     }
 
     #[test]
     fn strips_markdown_fences() {
-        let candidates = parse_candidates(
-            "```json\n[{\"command\": \"ls\", \"explanation\": \"why\"}]\n```",
-        )
-        .unwrap();
+        let candidates =
+            parse_candidates("```json\n[{\"command\": \"ls\", \"explanation\": \"why\"}]\n```")
+                .unwrap();
         assert_eq!(candidates.len(), 1);
         assert_eq!(candidates[0].command, "ls");
     }

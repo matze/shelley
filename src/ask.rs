@@ -99,10 +99,7 @@ async fn run_calls<T: ToolBox>(
     calls: &[ToolCall],
     seen: &mut HashSet<(String, String)>,
 ) -> Vec<Message> {
-    let fresh: Vec<&ToolCall> = calls
-        .iter()
-        .filter(|call| seen.insert(key(call)))
-        .collect();
+    let fresh: Vec<&ToolCall> = calls.iter().filter(|call| seen.insert(key(call))).collect();
 
     let results: HashMap<String, String> = fresh
         .iter()
@@ -242,15 +239,27 @@ mod tests {
         ]);
         let tools = FakeToolBox::new(&[("read_file", "hello world")]);
 
-        let answer = ask(&model, &tools, "summarize a", &budget(6, 1_000), &mut |_| {})
-            .await
-            .unwrap();
+        let answer = ask(
+            &model,
+            &tools,
+            "summarize a",
+            &budget(6, 1_000),
+            &mut |_| {},
+        )
+        .await
+        .unwrap();
 
         assert_eq!(answer, "contents summarized");
-        assert_eq!(tools.invocations(), vec![("read_file".into(), "{\"path\":\"a\"}".into())]);
+        assert_eq!(
+            tools.invocations(),
+            vec![("read_file".into(), "{\"path\":\"a\"}".into())]
+        );
 
         let second_call = &model.calls()[1];
-        assert!(matches!(second_call.last().unwrap().role, crate::model::Role::Tool));
+        assert!(matches!(
+            second_call.last().unwrap().role,
+            crate::model::Role::Tool
+        ));
     }
 
     #[tokio::test]
@@ -300,7 +309,10 @@ mod tests {
         let result = ask(&model, &tools, "q", &budget(6, 10), &mut |_| {}).await;
         assert!(matches!(
             result,
-            Err(AskError::TokenBudget { spent: 50, limit: 10 })
+            Err(AskError::TokenBudget {
+                spent: 50,
+                limit: 10
+            })
         ));
     }
 }

@@ -52,7 +52,11 @@ struct UrlArgs {
 }
 
 impl Tools {
-    pub fn new(root: impl AsRef<Path>, output_cap: usize, sandbox: Sandbox) -> Result<Self, ToolError> {
+    pub fn new(
+        root: impl AsRef<Path>,
+        output_cap: usize,
+        sandbox: Sandbox,
+    ) -> Result<Self, ToolError> {
         let root = root.as_ref().canonicalize()?;
         let http = reqwest::Client::builder()
             .build()
@@ -92,7 +96,9 @@ impl Tools {
     async fn list_dir(&self, path: &str) -> Result<String, ToolError> {
         let target = confine(&self.root, path).await?;
         let listing = match self.sandbox {
-            Sandbox::Enabled => run_sandboxed(&self.root, &["ls", "-1A", path_str(&target)?]).await?,
+            Sandbox::Enabled => {
+                run_sandboxed(&self.root, &["ls", "-1A", path_str(&target)?]).await?
+            }
             Sandbox::Disabled => native_listing(&target).await?,
         };
         Ok(self.cap(listing))
@@ -171,7 +177,8 @@ impl ToolBox for Tools {
 }
 
 fn args<T: DeserializeOwned>(call: &ToolCall) -> Result<T, ToolError> {
-    serde_json::from_str(&call.function.arguments).map_err(|error| ToolError::BadArgs(error.to_string()))
+    serde_json::from_str(&call.function.arguments)
+        .map_err(|error| ToolError::BadArgs(error.to_string()))
 }
 
 fn tool(name: &str, description: &str, parameters: serde_json::Value) -> ToolDef {
@@ -226,14 +233,28 @@ async fn run_sandboxed(root: &Path, argv: &[&str]) -> Result<String, ToolError> 
 
 fn bwrap_args(root: &str, argv: &[&str]) -> Vec<String> {
     let mut args: Vec<String> = [
-        "--ro-bind", root, root,
-        "--ro-bind", "/usr", "/usr",
-        "--ro-bind-try", "/bin", "/bin",
-        "--ro-bind-try", "/lib", "/lib",
-        "--ro-bind-try", "/lib64", "/lib64",
-        "--ro-bind-try", "/etc", "/etc",
-        "--proc", "/proc",
-        "--dev", "/dev",
+        "--ro-bind",
+        root,
+        root,
+        "--ro-bind",
+        "/usr",
+        "/usr",
+        "--ro-bind-try",
+        "/bin",
+        "/bin",
+        "--ro-bind-try",
+        "/lib",
+        "/lib",
+        "--ro-bind-try",
+        "/lib64",
+        "/lib64",
+        "--ro-bind-try",
+        "/etc",
+        "/etc",
+        "--proc",
+        "/proc",
+        "--dev",
+        "/dev",
         "--unshare-all",
         "--die-with-parent",
         "--",
@@ -297,7 +318,12 @@ mod tests {
         let dir = tempdir().unwrap();
         fs::write(dir.path().join("note.txt"), "hello").unwrap();
         let tools = tools_rooted_at(dir.path());
-        assert_eq!(tools.invoke(&call("read_file", r#"{"path":"note.txt"}"#)).await, "hello");
+        assert_eq!(
+            tools
+                .invoke(&call("read_file", r#"{"path":"note.txt"}"#))
+                .await,
+            "hello"
+        );
     }
 
     #[tokio::test]
@@ -305,7 +331,9 @@ mod tests {
         let dir = tempdir().unwrap();
         fs::write(dir.path().join("big.txt"), "x".repeat(100)).unwrap();
         let tools = tools_rooted_at(dir.path());
-        let out = tools.invoke(&call("read_file", r#"{"path":"big.txt"}"#)).await;
+        let out = tools
+            .invoke(&call("read_file", r#"{"path":"big.txt"}"#))
+            .await;
         assert!(out.ends_with(TRUNCATION_MARK));
         assert_eq!(out.len(), 64 + TRUNCATION_MARK.len());
     }
@@ -327,7 +355,9 @@ mod tests {
     async fn rejects_path_escaping_the_root() {
         let dir = tempdir().unwrap();
         let tools = tools_rooted_at(dir.path());
-        let out = tools.invoke(&call("read_file", r#"{"path":"../../etc/passwd"}"#)).await;
+        let out = tools
+            .invoke(&call("read_file", r#"{"path":"../../etc/passwd"}"#))
+            .await;
         assert!(out.starts_with("error:"));
     }
 
@@ -335,7 +365,9 @@ mod tests {
     async fn missing_file_returns_error_string() {
         let dir = tempdir().unwrap();
         let tools = tools_rooted_at(dir.path());
-        let out = tools.invoke(&call("read_file", r#"{"path":"nope.txt"}"#)).await;
+        let out = tools
+            .invoke(&call("read_file", r#"{"path":"nope.txt"}"#))
+            .await;
         assert!(out.contains("not found"));
     }
 
@@ -349,7 +381,10 @@ mod tests {
         let dir = tempdir().unwrap();
         let tools = tools_rooted_at(dir.path());
         let out = tools
-            .invoke(&call("fetch_url", &format!(r#"{{"url":"{}"}}"#, server.uri())))
+            .invoke(&call(
+                "fetch_url",
+                &format!(r#"{{"url":"{}"}}"#, server.uri()),
+            ))
             .await;
         assert_eq!(out, "page body");
     }
@@ -358,7 +393,9 @@ mod tests {
     async fn rejects_non_http_scheme() {
         let dir = tempdir().unwrap();
         let tools = tools_rooted_at(dir.path());
-        let out = tools.invoke(&call("fetch_url", r#"{"url":"file:///etc/passwd"}"#)).await;
+        let out = tools
+            .invoke(&call("fetch_url", r#"{"url":"file:///etc/passwd"}"#))
+            .await;
         assert!(out.contains("http(s)"));
     }
 
@@ -376,8 +413,18 @@ mod tests {
     async fn unknown_tool_and_bad_args_report_errors() {
         let dir = tempdir().unwrap();
         let tools = tools_rooted_at(dir.path());
-        assert!(tools.invoke(&call("frobnicate", "{}")).await.contains("unknown tool"));
-        assert!(tools.invoke(&call("read_file", "not json")).await.contains("invalid tool arguments"));
+        assert!(
+            tools
+                .invoke(&call("frobnicate", "{}"))
+                .await
+                .contains("unknown tool")
+        );
+        assert!(
+            tools
+                .invoke(&call("read_file", "not json"))
+                .await
+                .contains("invalid tool arguments")
+        );
     }
 
     #[test]

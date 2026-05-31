@@ -178,7 +178,10 @@ mod tests {
         layout(selection, |candidate, selected, width| {
             let gap = " ".repeat(width - candidate.command.chars().count());
             let marker = if selected { '>' } else { ' ' };
-            format!("{marker} {}{gap}  {}", candidate.command, candidate.explanation)
+            format!(
+                "{marker} {}{gap}  {}",
+                candidate.command, candidate.explanation
+            )
         })
     }
 
