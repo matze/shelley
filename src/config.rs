@@ -57,8 +57,8 @@ pub struct Budget {
 impl Default for Budget {
     fn default() -> Self {
         Self {
-            max_rounds: 6,
-            max_tokens: 32_000,
+            max_rounds: 16,
+            max_tokens: 64_000,
             tool_output_cap: 16 * 1024,
             timeout: Duration::from_secs(60),
         }
