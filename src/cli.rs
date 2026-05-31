@@ -7,7 +7,7 @@ use clap_complete::Shell;
 use futures_channel::mpsc;
 use strides::future::FutureExt;
 use strides::spinner::styles::DOTS_3;
-use strides::{Layout, Segment, Theme};
+use strides::{Layout, Output, Segment, Theme};
 
 const ICON: &str = "🐚";
 
@@ -19,7 +19,9 @@ static SPINNER_SEGMENTS: [Segment; 4] = [
 ];
 
 fn spinner_theme() -> Theme<'static> {
-    Theme::from(DOTS_3).with_layout(Layout::new(&SPINNER_SEGMENTS))
+    Theme::from(DOTS_3)
+        .with_layout(Layout::new(&SPINNER_SEGMENTS))
+        .with_output(Output::Stderr)
 }
 
 use crate::ask;
