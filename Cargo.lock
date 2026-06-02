@@ -1741,8 +1741,9 @@ checksum = "f42444fea5b87a39db4218d9422087e66a85d0e7a0963a439b07bcdf91804006"
 
 [[package]]
 name = "strides"
-version = "1.0.0-rc.2"
-source = "git+https://github.com/matze/strides?rev=70b5d25#70b5d2500ded13a995e9aa536720634588d35dd8"
+version = "1.0.0-rc.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e44fc23dc86b7a200838b8b54639891fa08c93d6af6d0bf16d5f63f74cb8afda"
 dependencies = [
  "futures-lite",
  "futures-timer",
@@ -1831,7 +1832,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "230a1b821ccbd75b185820a1f1ff7b14d21da1e442e22c0863ea5f08771a8874"
 dependencies = [
  "rustix",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
