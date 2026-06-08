@@ -2,7 +2,7 @@ use std::io::{self, Write};
 
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use crossterm::style::{Color, Stylize};
-use crossterm::terminal::{Clear, ClearType, disable_raw_mode, enable_raw_mode};
+use crossterm::terminal::{Clear, ClearType, disable_raw_mode, enable_raw_mode, size};
 use crossterm::{ExecutableCommand, cursor, execute, queue};
 
 use crate::propose::{Candidate, Selection};
@@ -33,37 +33,67 @@ pub fn action_for(key: KeyEvent) -> Option<Action> {
     }
 }
 
-fn layout(selection: &Selection, line: impl Fn(&Candidate, bool, usize) -> String) -> String {
-    let width = selection
-        .candidates()
-        .iter()
-        .map(|candidate| candidate.command.chars().count())
-        .max()
-        .unwrap_or(0);
+/// Renders each candidate as two rows: the command on the first, its
+/// explanation indented on the second. Nothing is truncated, so commands and
+/// descriptions wider than the terminal wrap naturally onto further rows.
+fn render_colored(selection: &Selection) -> Vec<String> {
     selection
         .candidates()
         .iter()
         .enumerate()
-        .map(|(row, candidate)| line(candidate, row == selection.cursor(), width))
-        .collect::<Vec<_>>()
-        .join("\n")
+        .flat_map(|(row, candidate)| {
+            let selected = row == selection.cursor();
+            let marker = match selected {
+                true => "❯".with(Color::Cyan).bold().to_string(),
+                false => " ".to_string(),
+            };
+            let emphasis = match selected {
+                true => Emphasis::Bold,
+                false => Emphasis::Normal,
+            };
+            let command = highlight(&candidate.command, emphasis);
+            let explanation = explanation(&candidate.explanation, selected);
+            [format!("{marker} {command}"), format!("  {explanation}")]
+        })
+        .collect()
 }
 
-fn render_colored(selection: &Selection) -> String {
-    layout(selection, |candidate, selected, width| {
-        let gap = " ".repeat(width - candidate.command.chars().count());
-        let marker = match selected {
-            true => "❯".with(Color::Cyan).bold().to_string(),
-            false => " ".to_string(),
-        };
-        let emphasis = match selected {
-            true => Emphasis::Bold,
-            false => Emphasis::Normal,
-        };
-        let command = highlight(&candidate.command, emphasis);
-        let explanation = explanation(&candidate.explanation, selected);
-        format!("{marker} {command}{gap}  {explanation}")
-    })
+fn terminal_width() -> usize {
+    size()
+        .map(|(cols, _)| cols as usize)
+        .ok()
+        .filter(|&cols| cols > 0)
+        .unwrap_or(80)
+}
+
+/// Counts the visible columns of a rendered line, skipping the ANSI escape
+/// sequences emitted by the styling so that wrapping is measured against the
+/// printable text only.
+fn visible_width(line: &str) -> usize {
+    let mut width = 0;
+    let mut chars = line.chars();
+    while let Some(c) = chars.next() {
+        if c == '\x1b' {
+            for escaped in chars.by_ref() {
+                if escaped.is_ascii_alphabetic() {
+                    break;
+                }
+            }
+        } else {
+            width += 1;
+        }
+    }
+    width
+}
+
+/// The number of physical terminal rows the lines occupy once soft wrapping at
+/// `term_width` is taken into account. The selection cursor relies on this to
+/// move back over exactly what was drawn.
+fn physical_rows(lines: &[String], term_width: usize) -> u16 {
+    lines
+        .iter()
+        .map(|line| visible_width(line).max(1).div_ceil(term_width) as u16)
+        .sum()
 }
 
 fn highlight(command: &str, emphasis: Emphasis) -> String {
@@ -113,7 +143,7 @@ pub fn select(selection: &mut Selection) -> io::Result<Option<Candidate>> {
 }
 
 fn interact(out: &mut impl Write, selection: &mut Selection) -> io::Result<Option<Candidate>> {
-    let rows = selection.candidates().len() as u16;
+    let rows = physical_rows(&render_colored(selection), terminal_width());
     draw(out, selection)?;
     loop {
         let Event::Key(key) = event::read()? else {
@@ -145,7 +175,7 @@ fn interact(out: &mut impl Write, selection: &mut Selection) -> io::Result<Optio
 }
 
 fn draw(out: &mut impl Write, selection: &Selection) -> io::Result<()> {
-    for line in render_colored(selection).split('\n') {
+    for line in render_colored(selection) {
         write!(out, "{line}\r\n")?;
     }
     out.flush()
@@ -175,14 +205,19 @@ mod tests {
     use super::*;
 
     fn render(selection: &Selection) -> String {
-        layout(selection, |candidate, selected, width| {
-            let gap = " ".repeat(width - candidate.command.chars().count());
-            let marker = if selected { '>' } else { ' ' };
-            format!(
-                "{marker} {}{gap}  {}",
-                candidate.command, candidate.explanation
-            )
-        })
+        selection
+            .candidates()
+            .iter()
+            .enumerate()
+            .flat_map(|(row, candidate)| {
+                let marker = if row == selection.cursor() { '>' } else { ' ' };
+                [
+                    format!("{marker} {}", candidate.command),
+                    format!("  {}", candidate.explanation),
+                ]
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
     }
 
     fn key(code: KeyCode) -> KeyEvent {
@@ -216,6 +251,24 @@ mod tests {
             Some(Action::Cancel)
         );
         assert_eq!(action_for(key(KeyCode::Char('x'))), None);
+    }
+
+    #[test]
+    fn visible_width_ignores_ansi_escapes() {
+        let plain = "ls -lS";
+        let styled = "ls -lS".green().bold().to_string();
+        assert_eq!(visible_width(plain), 6);
+        assert_eq!(visible_width(&styled), 6);
+    }
+
+    #[test]
+    fn physical_rows_counts_wrapped_lines() {
+        let lines = vec![
+            "a".repeat(10),  // 1 row at width 10
+            "b".repeat(11),  // wraps to 2 rows
+            String::new(),   // empty line still occupies 1 row
+        ];
+        assert_eq!(physical_rows(&lines, 10), 4);
     }
 
     #[test]

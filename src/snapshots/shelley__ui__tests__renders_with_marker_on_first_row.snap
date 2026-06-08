@@ -2,5 +2,7 @@
 source: src/ui.rs
 expression: render(&selection)
 ---
-> ls -lS    by size
-  du -sh *  disk usage
+> ls -lS
+  by size
+  du -sh *
+  disk usage
