@@ -278,8 +278,8 @@ mod tests {
     #[test]
     fn budget_has_expected_defaults() {
         let budget = Budget::default();
-        assert_eq!(budget.max_rounds, 6);
-        assert_eq!(budget.max_tokens, 32_000);
+        assert_eq!(budget.max_rounds, 16);
+        assert_eq!(budget.max_tokens, 64_000);
         assert_eq!(budget.tool_output_cap, 16 * 1024);
         assert_eq!(budget.timeout, Duration::from_secs(60));
     }
