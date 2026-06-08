@@ -78,6 +78,7 @@ pub struct Config {
 #[serde(deny_unknown_fields)]
 pub struct FileConfig {
     pub provider: Option<Provider>,
+    pub base_url: Option<String>,
     pub model: Option<String>,
     pub api_key: Option<String>,
 }
@@ -117,12 +118,13 @@ fn load_file() -> Result<FileConfig, ConfigError> {
 impl Config {
     pub fn new(
         provider: Provider,
+        base_url: Option<String>,
         model: Option<String>,
         api_key: String,
         sandbox: Sandbox,
     ) -> Self {
         Self {
-            base_url: provider.base_url().to_string(),
+            base_url: base_url.unwrap_or_else(|| provider.base_url().to_string()),
             model: model.unwrap_or_else(|| provider.default_model().to_string()),
             api_key,
             sandbox,
@@ -132,15 +134,17 @@ impl Config {
 
     pub fn resolve(
         provider: Option<Provider>,
+        base_url: Option<String>,
         model: Option<String>,
         sandbox: Sandbox,
     ) -> Result<Self, ConfigError> {
-        Self::merge(load_file()?, provider, model, sandbox)
+        Self::merge(load_file()?, provider, base_url, model, sandbox)
     }
 
     fn merge(
         file: FileConfig,
         provider: Option<Provider>,
+        base_url: Option<String>,
         model: Option<String>,
         sandbox: Sandbox,
     ) -> Result<Self, ConfigError> {
@@ -149,7 +153,13 @@ impl Config {
             .ok()
             .or(file.api_key)
             .ok_or(ConfigError::MissingApiKey(provider.api_key_env()))?;
-        Ok(Self::new(provider, model.or(file.model), api_key, sandbox))
+        Ok(Self::new(
+            provider,
+            base_url.or(file.base_url),
+            model.or(file.model),
+            api_key,
+            sandbox,
+        ))
     }
 }
 
@@ -167,7 +177,13 @@ mod tests {
 
     #[test]
     fn new_uses_default_model_when_unset() {
-        let config = Config::new(Provider::DeepSeek, None, "k".into(), Sandbox::Disabled);
+        let config = Config::new(
+            Provider::DeepSeek,
+            None,
+            None,
+            "k".into(),
+            Sandbox::Disabled,
+        );
         assert_eq!(config.model, "deepseek-v4-pro");
         assert_eq!(config.base_url, "https://api.deepseek.com/v1");
     }
@@ -176,6 +192,7 @@ mod tests {
     fn new_respects_model_override() {
         let config = Config::new(
             Provider::OpenAi,
+            None,
             Some("gpt-x".into()),
             "k".into(),
             Sandbox::Disabled,
@@ -184,15 +201,28 @@ mod tests {
     }
 
     #[test]
+    fn new_respects_base_url_override() {
+        let config = Config::new(
+            Provider::OpenAi,
+            Some("http://localhost:11434/v1".into()),
+            None,
+            "k".into(),
+            Sandbox::Disabled,
+        );
+        assert_eq!(config.base_url, "http://localhost:11434/v1");
+    }
+
+    #[test]
     fn file_config_parses_all_fields() {
         let file: FileConfig = toml::from_str(
-            "provider = \"deepseek\"\nmodel = \"deepseek-v4-flash\"\napi_key = \"sk-file\"\n",
+            "provider = \"deepseek\"\nbase_url = \"http://localhost:11434/v1\"\nmodel = \"deepseek-v4-flash\"\napi_key = \"sk-file\"\n",
         )
         .unwrap();
         assert_eq!(
             file,
             FileConfig {
                 provider: Some(Provider::DeepSeek),
+                base_url: Some("http://localhost:11434/v1".into()),
                 model: Some("deepseek-v4-flash".into()),
                 api_key: Some("sk-file".into()),
             }
@@ -216,17 +246,19 @@ mod tests {
     fn merge_prefers_cli_over_file() {
         let file = FileConfig {
             provider: Some(Provider::OpenAi),
+            base_url: Some("http://from-file/v1".into()),
             model: Some("from-file".into()),
             api_key: Some("k".into()),
         };
         let config = Config::merge(
             file,
             Some(Provider::DeepSeek),
+            Some("http://from-cli/v1".into()),
             Some("from-cli".into()),
             Sandbox::Disabled,
         )
         .unwrap();
-        assert_eq!(config.base_url, "https://api.deepseek.com/v1");
+        assert_eq!(config.base_url, "http://from-cli/v1");
         assert_eq!(config.model, "from-cli");
     }
 
@@ -234,10 +266,11 @@ mod tests {
     fn merge_falls_back_to_file_then_defaults() {
         let file = FileConfig {
             provider: Some(Provider::DeepSeek),
+            base_url: None,
             model: None,
             api_key: Some("k".into()),
         };
-        let config = Config::merge(file, None, None, Sandbox::Disabled).unwrap();
+        let config = Config::merge(file, None, None, None, Sandbox::Disabled).unwrap();
         assert_eq!(config.base_url, "https://api.deepseek.com/v1");
         assert_eq!(config.model, "deepseek-v4-pro");
     }

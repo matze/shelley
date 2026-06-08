@@ -30,9 +30,13 @@ Shelley reads `$XDG_CONFIG_HOME/shelley/config.toml` (falling back to
 
 ```toml
 provider = "deepseek"          # openai | deepseek
+base_url = "http://host/v1"    # override the provider's API base URL
 model = "deepseek-v4-flash"    # override the provider's default model
 api_key = "sk-..."             # used if the provider's env var is unset
 ```
+
+`base_url` lets you point an OpenAI-compatible endpoint (a local server, a
+proxy, or another vendor) at the chosen provider's credentials and defaults.
 
 ### Environment
 
@@ -49,6 +53,7 @@ export DEEPSEEK_API_KEY=...   # with provider = deepseek
 Flags (work on any subcommand) override both the file and the environment:
 
 - `--provider openai|deepseek` (file, else `openai`)
+- `--base-url <url>` — override the provider's API base URL
 - `--model <name>` — override the provider's default model
 - `--sandbox enabled|disabled` (default `disabled`) — run read-only file tools
   inside a [bubblewrap](https://github.com/containers/bubblewrap) sandbox

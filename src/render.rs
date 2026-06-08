@@ -30,7 +30,9 @@ fn skin() -> MadSkin {
         header.compound_style.set_fg(Color::Cyan);
         header.compound_style.add_attr(Attribute::Bold);
     }
-    skin.headers[0].compound_style.add_attr(Attribute::Underlined);
+    skin.headers[0]
+        .compound_style
+        .add_attr(Attribute::Underlined);
     skin.bullet = StyledChar::new(CompoundStyle::with_fg(Color::Cyan), '•');
     skin.quote_mark = StyledChar::new(
         CompoundStyle::new(Some(Color::Cyan), None, Attribute::Bold.into()),

@@ -75,7 +75,7 @@ mod tests {
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
     fn config_for(server: &MockServer, provider: Provider) -> Config {
-        let mut config = Config::new(provider, None, "secret".into(), Sandbox::Disabled);
+        let mut config = Config::new(provider, None, None, "secret".into(), Sandbox::Disabled);
         config.base_url = server.uri();
         config
     }

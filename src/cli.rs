@@ -47,6 +47,12 @@ struct Cli {
         help = "Model provider (default: config file or openai)"
     )]
     provider: Option<Provider>,
+    #[arg(
+        long,
+        global = true,
+        help = "Override the provider's API base URL (e.g. http://localhost:11434/v1)"
+    )]
+    base_url: Option<String>,
     #[arg(long, global = true, help = "Override the provider's default model")]
     model: Option<String>,
     #[arg(
@@ -94,14 +100,14 @@ pub async fn run() -> Result<()> {
     match cli.command {
         Command::Propose { query } => {
             propose(
-                Config::resolve(cli.provider, cli.model, cli.sandbox)?,
+                Config::resolve(cli.provider, cli.base_url, cli.model, cli.sandbox)?,
                 query.join(" "),
             )
             .await
         }
         Command::Ask { query } => {
             ask(
-                Config::resolve(cli.provider, cli.model, cli.sandbox)?,
+                Config::resolve(cli.provider, cli.base_url, cli.model, cli.sandbox)?,
                 query.join(" "),
             )
             .await
