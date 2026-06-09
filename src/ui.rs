@@ -9,9 +9,9 @@ use crate::propose::{Candidate, Selection};
 use crate::syntax::{self, Class, Span};
 
 #[derive(Clone, Copy)]
-enum Emphasis {
-    Normal,
-    Bold,
+enum Style {
+    Selected,
+    Unselected,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -35,24 +35,25 @@ pub fn action_for(key: KeyEvent) -> Option<Action> {
 
 /// Renders each candidate as two rows: the command on the first, its
 /// explanation indented on the second. Nothing is truncated, so commands and
-/// descriptions wider than the terminal wrap naturally onto further rows.
+/// descriptions wider than the terminal wrap naturally onto further rows. Only
+/// the selected row is syntax highlighted, so it stands out and reads easily.
 fn render_colored(selection: &Selection) -> Vec<String> {
     selection
         .candidates()
         .iter()
         .enumerate()
         .flat_map(|(row, candidate)| {
-            let selected = row == selection.cursor();
-            let marker = match selected {
-                true => "❯".with(Color::Cyan).bold().to_string(),
-                false => " ".to_string(),
+            let style = match row == selection.cursor() {
+                true => Style::Selected,
+                false => Style::Unselected,
             };
-            let emphasis = match selected {
-                true => Emphasis::Bold,
-                false => Emphasis::Normal,
+            let marker = match style {
+                Style::Selected => "❯".with(Color::Cyan).bold().to_string(),
+                Style::Unselected => " ".to_string(),
             };
-            let command = highlight(&candidate.command, emphasis);
-            let explanation = explanation(&candidate.explanation, selected);
+            let command = command(&candidate.command, style);
+            let explanation = explanation(&candidate.explanation, style);
+
             [format!("{marker} {command}"), format!("  {explanation}")]
         })
         .collect()
@@ -96,22 +97,23 @@ fn physical_rows(lines: &[String], term_width: usize) -> u16 {
         .sum()
 }
 
-fn highlight(command: &str, emphasis: Emphasis) -> String {
-    syntax::spans(command)
-        .iter()
-        .map(|span| paint_span(span, emphasis))
-        .collect()
+fn command(command: &str, style: Style) -> String {
+    match style {
+        Style::Selected => highlight(command),
+        Style::Unselected => command.dim().to_string(),
+    }
 }
 
-fn paint_span(span: &Span, emphasis: Emphasis) -> String {
+fn highlight(command: &str) -> String {
+    syntax::spans(command).iter().map(paint_span).collect()
+}
+
+fn paint_span(span: &Span) -> String {
     let styled = match color_of(span.class) {
         Some(color) => span.text.clone().with(color),
         None => span.text.clone().stylize(),
     };
-    match emphasis {
-        Emphasis::Bold => styled.bold().to_string(),
-        Emphasis::Normal => styled.to_string(),
-    }
+    styled.bold().to_string()
 }
 
 fn color_of(class: Class) -> Option<Color> {
@@ -125,10 +127,10 @@ fn color_of(class: Class) -> Option<Color> {
     }
 }
 
-fn explanation(text: &str, selected: bool) -> String {
-    match selected {
-        true => text.to_string(),
-        false => text.stylize().dim().to_string(),
+fn explanation(text: &str, style: Style) -> String {
+    match style {
+        Style::Selected => text.to_string(),
+        Style::Unselected => text.dim().to_string(),
     }
 }
 
